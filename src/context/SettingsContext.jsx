@@ -9,7 +9,10 @@ export const SettingsProvider = ({ children }) => {
     storeName: 'Fortune Star Computer',
     subtitle: 'Harco Mangga Dua Lt. 2',
     senderName: 'Andry',
-    logoBase64: ''
+    logoBase64: '',
+    defaultQuotationNotes: 'Harga sewaktu-waktu dapat berubah tanpa pemberitahuan sebelumnya.',
+    defaultInvoiceNotes: 'Terima kasih atas kepercayaan Anda.\nMohon lakukan pembayaran ke Rekening BCA 1234567890 a.n Toko Komputer',
+    defaultPONotes: 'Mohon dikirimkan sesuai dengan spesifikasi dan waktu yang disepakati.'
   });
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +27,10 @@ export const SettingsProvider = ({ children }) => {
         storeName: 'Fortune Star Computer',
         subtitle: 'Harco Mangga Dua Lt. 2',
         senderName: 'Andry',
-        logoBase64: ''
+        logoBase64: '',
+        defaultQuotationNotes: 'Harga sewaktu-waktu dapat berubah tanpa pemberitahuan sebelumnya.',
+        defaultInvoiceNotes: 'Terima kasih atas kepercayaan Anda.\nMohon lakukan pembayaran ke Rekening BCA 1234567890 a.n Toko Komputer',
+        defaultPONotes: 'Mohon dikirimkan sesuai dengan spesifikasi dan waktu yang disepakati.'
       };
       const docRef = await addDoc(collection(db, "settings"), defaultSettings);
       setSettings({ id: docRef.id, ...defaultSettings });

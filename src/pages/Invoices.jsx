@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, collection, getDocs, addDoc } from '../lib/db';
 import { Plus, Printer } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, generateDocumentNumber } from '../utils/format';
 import { useSettings } from '../context/SettingsContext';
 
 export default function Invoices() {
@@ -15,10 +15,9 @@ export default function Invoices() {
   const [formData, setFormData] = useState({
     customerId: '',
     date: new Date().toISOString().split('T')[0],
-    dueDate: '',
     discount: 0,
     downPayment: 0,
-    notes: 'Terima kasih atas kepercayaan Anda.',
+    notes: '',
     items: [{ name: '', qty: 1, price: 0 }]
   });
 
@@ -34,6 +33,18 @@ export default function Invoices() {
     setCustomers(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
+  const handleCreateNew = () => {
+    setFormData({
+      customerId: '',
+      date: new Date().toISOString().split('T')[0],
+      discount: 0,
+      downPayment: 0,
+      notes: settings?.defaultInvoiceNotes || '',
+      items: [{ name: '', qty: 1, price: 0 }]
+    });
+    setIsCreating(true);
+  };
+
   const calculateSubtotal = (items) => items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const calculateGrandTotal = (subtotal, discount, dp) => subtotal - discount - dp;
 
@@ -41,12 +52,16 @@ export default function Invoices() {
     e.preventDefault();
     const customer = customers.find(c => c.id === formData.customerId);
     const subtotal = calculateSubtotal(formData.items);
+
+    // Generate Invoice Number
+    const docNumber = generateDocumentNumber('INV', invoices);
+
     const docData = {
       ...formData,
       customerName: customer?.name || 'Unknown',
       subtotal,
       total: calculateGrandTotal(subtotal, formData.discount, formData.downPayment),
-      number: `INV-${Date.now()}`
+      number: docNumber
     };
     await addDoc(collection(db, "invoices"), docData);
 
@@ -80,7 +95,7 @@ export default function Invoices() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Invoice</h1>
         {!isCreating && !selectedDoc && (
-          <button onClick={() => setIsCreating(true)} className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2"><Plus size={20} /> Buat Invoice</button>
+          <button onClick={handleCreateNew} className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2"><Plus size={20} /> Buat Invoice</button>
         )}
         {(isCreating || selectedDoc) && (
           <button onClick={() => { setIsCreating(false); setSelectedDoc(null); }} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md">Kembali</button>
@@ -102,7 +117,7 @@ export default function Invoices() {
             <tbody className="bg-white divide-y divide-gray-200">
               {invoices.map(i => (
                 <tr key={i.id}>
-                  <td className="px-6 py-4">{i.number}</td>
+                  <td className="px-6 py-4 font-medium">{i.number}</td>
                   <td className="px-6 py-4">{formatDate(i.date)}</td>
                   <td className="px-6 py-4">{i.customerName}</td>
                   <td className="px-6 py-4 font-semibold">{formatCurrency(i.total)}</td>
@@ -117,18 +132,17 @@ export default function Invoices() {
       {isCreating && (
         <div className="bg-white rounded-lg shadow p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-             {/* Form Inputs (Same as previous) */}
              <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Customer</label>
-                <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="mt-1 block w-full border rounded-md p-2">
+                <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
                   <option value="">Pilih Customer...</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Tanggal Invoice</label>
-                <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="mt-1 block w-full border rounded-md p-2" />
+                <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
               </div>
             </div>
 
@@ -139,23 +153,28 @@ export default function Invoices() {
               </div>
               {formData.items.map((item, index) => (
                 <div key={index} className="flex gap-2 mb-2 items-start">
-                  <input required placeholder="Nama Barang/Jasa" value={item.name} onChange={e => updateItem(index, 'name', e.target.value)} className="flex-1 border rounded p-2" />
-                  <input required type="number" placeholder="Qty" value={item.qty} onChange={e => updateItem(index, 'qty', Number(e.target.value))} className="w-20 border rounded p-2" />
-                  <input required type="number" placeholder="Harga" value={item.price} onChange={e => updateItem(index, 'price', Number(e.target.value))} className="w-40 border rounded p-2" />
+                  <input required placeholder="Nama Barang/Jasa" value={item.name} onChange={e => updateItem(index, 'name', e.target.value)} className="flex-1 border border-gray-300 rounded p-2" />
+                  <input required type="number" placeholder="Qty" value={item.qty} onChange={e => updateItem(index, 'qty', Number(e.target.value))} className="w-20 border border-gray-300 rounded p-2" />
+                  <input required type="number" placeholder="Harga" value={item.price} onChange={e => updateItem(index, 'price', Number(e.target.value))} className="w-40 border border-gray-300 rounded p-2" />
                   <button type="button" onClick={() => removeItem(index)} className="p-2 text-red-600 mt-1">X</button>
                 </div>
               ))}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Catatan Tambahan / Info Pembayaran</label>
+              <textarea rows="3" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2"></textarea>
             </div>
 
             <div className="border-t pt-4 w-1/2 ml-auto space-y-3">
                <div className="flex justify-between"><span>Subtotal:</span> <span>{formatCurrency(currentSubtotal)}</span></div>
                <div className="flex justify-between items-center">
                  <span>Diskon (Rp):</span>
-                 <input type="number" value={formData.discount} onChange={e => setFormData({...formData, discount: Number(e.target.value)})} className="w-40 border rounded p-1 text-right" />
+                 <input type="number" value={formData.discount} onChange={e => setFormData({...formData, discount: Number(e.target.value)})} className="w-40 border border-gray-300 rounded p-1 text-right" />
                </div>
                <div className="flex justify-between items-center">
                  <span>Down Payment (DP):</span>
-                 <input type="number" value={formData.downPayment} onChange={e => setFormData({...formData, downPayment: Number(e.target.value)})} className="w-40 border rounded p-1 text-right" />
+                 <input type="number" value={formData.downPayment} onChange={e => setFormData({...formData, downPayment: Number(e.target.value)})} className="w-40 border border-gray-300 rounded p-1 text-right" />
                </div>
                <div className="flex justify-between text-xl font-bold border-t pt-2">
                  <span>Sisa Bayar / Total:</span>
@@ -182,7 +201,7 @@ export default function Invoices() {
                  )}
                  <div>
                    <h1 className="text-3xl font-extrabold text-blue-900 uppercase tracking-wide">{settings.storeName}</h1>
-                   <p className="text-gray-600 mt-1 font-medium">{settings.subtitle}</p>
+                   <p className="text-gray-600 mt-1 font-medium whitespace-pre-wrap">{settings.subtitle}</p>
                  </div>
                </div>
                <div className="text-right">
@@ -231,7 +250,7 @@ export default function Invoices() {
 
              <div className="mt-8 border-l-4 border-blue-500 pl-4 py-2 bg-gray-50">
                 <p className="font-semibold text-gray-800">Catatan:</p>
-                <p className="text-gray-600">{selectedDoc.notes}</p>
+                <p className="text-gray-600 whitespace-pre-wrap">{selectedDoc.notes}</p>
              </div>
 
              <div className="mt-16 flex justify-end">

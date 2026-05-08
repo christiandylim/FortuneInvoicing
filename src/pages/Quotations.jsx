@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, collection, getDocs, addDoc } from '../lib/db';
 import { Plus, Printer } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, generateDocumentNumber } from '../utils/format';
 import { useSettings } from '../context/SettingsContext';
 
 export default function Quotations() {
@@ -16,7 +16,7 @@ export default function Quotations() {
     customerId: '',
     date: new Date().toISOString().split('T')[0],
     validUntil: '',
-    notes: 'Harga sewaktu-waktu dapat berubah tanpa pemberitahuan sebelumnya.',
+    notes: '',
     items: [{ name: '', qty: 1, price: 0 }]
   });
 
@@ -32,16 +32,31 @@ export default function Quotations() {
     setCustomers(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
+  const handleCreateNew = () => {
+    setFormData({
+      customerId: '',
+      date: new Date().toISOString().split('T')[0],
+      validUntil: '',
+      notes: settings?.defaultQuotationNotes || '',
+      items: [{ name: '', qty: 1, price: 0 }]
+    });
+    setIsCreating(true);
+  };
+
   const calculateTotal = (items) => items.reduce((sum, item) => sum + (item.qty * item.price), 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const customer = customers.find(c => c.id === formData.customerId);
+
+    // Generate Quotation Number
+    const docNumber = generateDocumentNumber('QUO', quotations);
+
     const docData = {
       ...formData,
       customerName: customer?.name || 'Unknown',
       total: calculateTotal(formData.items),
-      number: `QUO-${Date.now()}`
+      number: docNumber
     };
     await addDoc(collection(db, "quotations"), docData);
     setIsCreating(false);
@@ -61,7 +76,7 @@ export default function Quotations() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Surat Penawaran</h1>
         {!isCreating && !selectedDoc && (
-          <button onClick={() => setIsCreating(true)} className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2">
+          <button onClick={handleCreateNew} className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2">
             <Plus size={20} /> Buat Penawaran
           </button>
         )}
@@ -87,7 +102,7 @@ export default function Quotations() {
             <tbody className="bg-white divide-y divide-gray-200">
               {quotations.map(q => (
                 <tr key={q.id}>
-                  <td className="px-6 py-4">{q.number}</td>
+                  <td className="px-6 py-4 font-medium">{q.number}</td>
                   <td className="px-6 py-4">{formatDate(q.date)}</td>
                   <td className="px-6 py-4">{q.customerName}</td>
                   <td className="px-6 py-4 font-semibold">{formatCurrency(q.total)}</td>
@@ -104,18 +119,17 @@ export default function Quotations() {
       {isCreating && (
         <div className="bg-white rounded-lg shadow p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-             {/* ... form inputs remain mostly same, omitted for brevity but standard ... */}
              <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Customer</label>
-                <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="mt-1 block w-full border rounded-md p-2">
+                <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2">
                   <option value="">Pilih Customer...</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Tanggal</label>
-                <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="mt-1 block w-full border rounded-md p-2" />
+                <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
               </div>
             </div>
 
@@ -126,9 +140,9 @@ export default function Quotations() {
               </div>
               {formData.items.map((item, index) => (
                 <div key={index} className="flex gap-2 mb-2 items-start">
-                  <input required placeholder="Nama Barang/Jasa" value={item.name} onChange={e => updateItem(index, 'name', e.target.value)} className="flex-1 border rounded p-2" />
-                  <input required type="number" placeholder="Qty" value={item.qty} onChange={e => updateItem(index, 'qty', Number(e.target.value))} className="w-20 border rounded p-2" />
-                  <input required type="number" placeholder="Harga Satuan" value={item.price} onChange={e => updateItem(index, 'price', Number(e.target.value))} className="w-40 border rounded p-2" />
+                  <input required placeholder="Nama Barang/Jasa" value={item.name} onChange={e => updateItem(index, 'name', e.target.value)} className="flex-1 border border-gray-300 rounded p-2" />
+                  <input required type="number" placeholder="Qty" value={item.qty} onChange={e => updateItem(index, 'qty', Number(e.target.value))} className="w-20 border border-gray-300 rounded p-2" />
+                  <input required type="number" placeholder="Harga Satuan" value={item.price} onChange={e => updateItem(index, 'price', Number(e.target.value))} className="w-40 border border-gray-300 rounded p-2" />
                   <button type="button" onClick={() => removeItem(index)} className="p-2 text-red-600 mt-1">X</button>
                 </div>
               ))}
@@ -136,7 +150,7 @@ export default function Quotations() {
 
             <div>
                <label className="block text-sm font-medium text-gray-700">Catatan Tambahan</label>
-               <textarea rows="2" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border rounded-md p-2"></textarea>
+               <textarea rows="3" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md p-2"></textarea>
             </div>
 
             <div className="text-right text-xl font-bold">Total: {formatCurrency(calculateTotal(formData.items))}</div>
@@ -157,7 +171,7 @@ export default function Quotations() {
                   <img src={settings.logoBase64} alt="Logo" className="max-h-24 object-contain mb-4" />
                )}
                <h1 className="text-3xl font-bold uppercase tracking-wider">{settings.storeName}</h1>
-               <p className="text-gray-600 mt-1">{settings.subtitle}</p>
+               <p className="text-gray-600 mt-1 whitespace-pre-wrap text-center">{settings.subtitle}</p>
              </div>
 
              <div className="text-center bg-gray-100 py-2 mb-6 rounded font-bold uppercase tracking-widest border border-gray-300">Surat Penawaran</div>

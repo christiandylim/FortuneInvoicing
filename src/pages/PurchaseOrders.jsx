@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, collection, getDocs, addDoc } from '../lib/db';
 import { Plus, Printer } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, generateDocumentNumber } from '../utils/format';
 import { useSettings } from '../context/SettingsContext';
 
 export default function PurchaseOrders() {
@@ -15,7 +15,7 @@ export default function PurchaseOrders() {
   const [formData, setFormData] = useState({
     supplierId: '',
     date: new Date().toISOString().split('T')[0],
-    notes: 'Mohon dikirimkan sesuai dengan spesifikasi dan waktu yang disepakati.',
+    notes: '',
     items: [{ name: '', qty: 1, price: 0 }]
   });
 
@@ -31,17 +31,31 @@ export default function PurchaseOrders() {
     setSuppliers(sSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
+  const handleCreateNew = () => {
+    setFormData({
+      supplierId: '',
+      date: new Date().toISOString().split('T')[0],
+      notes: settings?.defaultPONotes || '',
+      items: [{ name: '', qty: 1, price: 0 }]
+    });
+    setIsCreating(true);
+  };
+
   const calculateTotal = (items) => items.reduce((sum, item) => sum + (item.qty * item.price), 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const supplier = suppliers.find(s => s.id === formData.supplierId);
+
+    // Generate PO Number
+    const docNumber = generateDocumentNumber('PO', pos);
+
     const docData = {
       ...formData,
       supplierName: supplier?.name || 'Unknown',
       supplierAddress: supplier?.address || '',
       total: calculateTotal(formData.items),
-      number: `PO-${Date.now()}`
+      number: docNumber
     };
     await addDoc(collection(db, "purchase_orders"), docData);
     setIsCreating(false);
@@ -61,7 +75,7 @@ export default function PurchaseOrders() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Purchase Order</h1>
         {!isCreating && !selectedDoc && (
-          <button onClick={() => setIsCreating(true)} className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2"><Plus size={20} /> Buat PO</button>
+          <button onClick={handleCreateNew} className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2"><Plus size={20} /> Buat PO</button>
         )}
         {(isCreating || selectedDoc) && (
           <button onClick={() => { setIsCreating(false); setSelectedDoc(null); }} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md">Kembali</button>
@@ -83,7 +97,7 @@ export default function PurchaseOrders() {
             <tbody className="bg-white divide-y divide-gray-200">
               {pos.map(po => (
                 <tr key={po.id}>
-                  <td className="px-6 py-4">{po.number}</td>
+                  <td className="px-6 py-4 font-medium">{po.number}</td>
                   <td className="px-6 py-4">{formatDate(po.date)}</td>
                   <td className="px-6 py-4">{po.supplierName}</td>
                   <td className="px-6 py-4 font-semibold">{formatCurrency(po.total)}</td>
@@ -127,6 +141,11 @@ export default function PurchaseOrders() {
               ))}
             </div>
 
+            <div>
+               <label className="block text-sm font-medium text-gray-700">Catatan Tambahan</label>
+               <textarea rows="3" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border rounded-md p-2"></textarea>
+            </div>
+
             <div className="text-right text-xl font-bold">Total Estimasi: {formatCurrency(calculateTotal(formData.items))}</div>
 
             <div className="flex justify-end gap-2 mt-6">
@@ -148,7 +167,7 @@ export default function PurchaseOrders() {
                  )}
                  <div>
                    <h1 className="text-3xl font-bold uppercase text-gray-900">{settings.storeName}</h1>
-                   <p className="text-gray-600 mt-1 font-medium">{settings.subtitle}</p>
+                   <p className="text-gray-600 mt-1 font-medium whitespace-pre-wrap">{settings.subtitle}</p>
                  </div>
                </div>
                <div className="text-right">
@@ -198,7 +217,7 @@ export default function PurchaseOrders() {
 
              <div className="mt-10 pt-4">
                 <p className="font-bold text-gray-800">Special Instructions / Remarks:</p>
-                <p className="text-gray-600 italic">{selectedDoc.notes}</p>
+                <p className="text-gray-600 whitespace-pre-wrap">{selectedDoc.notes}</p>
              </div>
 
              <div className="mt-16 flex justify-between">

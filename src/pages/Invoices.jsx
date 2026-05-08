@@ -3,12 +3,14 @@ import { db, collection, getDocs, addDoc } from '../lib/db';
 import { Plus, Printer } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useSettings } from '../context/SettingsContext';
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const { settings } = useSettings();
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -115,7 +117,8 @@ export default function Invoices() {
       {isCreating && (
         <div className="bg-white rounded-lg shadow p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+             {/* Form Inputs (Same as previous) */}
+             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Customer</label>
                 <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="mt-1 block w-full border rounded-md p-2">
@@ -170,26 +173,33 @@ export default function Invoices() {
       {selectedDoc && (
         <div className="bg-gray-100 p-6 rounded-lg">
           <div className="mb-4 flex justify-end"><button onClick={handlePrint} className="bg-green-600 text-white px-4 py-2 rounded flex gap-2"><Printer size={20}/> Cetak / PDF</button></div>
-          <div ref={printRef} className="bg-white p-10 max-w-4xl mx-auto shadow-lg text-black print:shadow-none">
+          <div ref={printRef} className="bg-white p-10 max-w-4xl mx-auto shadow-lg text-black print:shadow-none print:p-0">
+
              <div className="border-b-2 border-blue-800 pb-4 mb-6 flex justify-between items-end">
-               <div>
-                 <h1 className="text-4xl font-extrabold text-blue-900 uppercase tracking-widest">INVOICE</h1>
-                 <p className="text-gray-600 mt-1 font-medium">Toko Komputer App</p>
+               <div className="flex items-center gap-4">
+                 {settings.logoBase64 && (
+                    <img src={settings.logoBase64} alt="Logo" className="max-h-20 object-contain" />
+                 )}
+                 <div>
+                   <h1 className="text-3xl font-extrabold text-blue-900 uppercase tracking-wide">{settings.storeName}</h1>
+                   <p className="text-gray-600 mt-1 font-medium">{settings.subtitle}</p>
+                 </div>
                </div>
                <div className="text-right">
+                 <h2 className="text-4xl font-black text-gray-200 uppercase tracking-widest mb-2">INVOICE</h2>
                  <p className="text-xl font-semibold text-gray-800">{selectedDoc.number}</p>
                  <p className="text-gray-500">Tanggal: {formatDate(selectedDoc.date)}</p>
                </div>
              </div>
 
-             <div className="mb-8 p-4 bg-gray-50 rounded-lg">
+             <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-500 mb-1">Tagihan Untuk:</p>
                 <p className="font-bold text-xl text-gray-800">{selectedDoc.customerName}</p>
              </div>
 
              <table className="w-full mb-8 border-collapse">
                <thead>
-                 <tr className="bg-blue-900 text-white">
+                 <tr className="bg-blue-900 text-white print:bg-blue-900 print:text-black">
                    <th className="py-3 px-4 text-left rounded-tl-lg">Deskripsi Item</th>
                    <th className="py-3 px-4 text-center">Qty</th>
                    <th className="py-3 px-4 text-right">Harga Satuan</th>
@@ -220,13 +230,15 @@ export default function Invoices() {
              </div>
 
              <div className="mt-8 border-l-4 border-blue-500 pl-4 py-2 bg-gray-50">
-                <p className="font-semibold text-gray-800">Instruksi Pembayaran & Catatan:</p>
+                <p className="font-semibold text-gray-800">Catatan:</p>
                 <p className="text-gray-600">{selectedDoc.notes}</p>
-                <p className="text-gray-600 mt-2">Mohon lakukan pembayaran ke Rekening BCA 1234567890 a.n Toko Komputer</p>
              </div>
 
-             <div className="mt-16 text-right text-gray-500 italic text-sm">
-               Dibuat oleh sistem - Dokumen ini sah meski tanpa tanda tangan basah.
+             <div className="mt-16 flex justify-end">
+               <div className="text-center w-48">
+                 <p className="mb-16">Hormat Kami,</p>
+                 <p className="border-t border-gray-400 pt-1 font-semibold">( {settings.senderName} )</p>
+               </div>
              </div>
           </div>
         </div>

@@ -3,12 +3,14 @@ import { db, collection, getDocs, addDoc } from '../lib/db';
 import { Plus, Printer } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useSettings } from '../context/SettingsContext';
 
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const { settings } = useSettings();
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -19,18 +21,13 @@ export default function Quotations() {
   });
 
   const printRef = useRef();
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-  });
+  const handlePrint = useReactToPrint({ content: () => printRef.current });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     const qSnap = await getDocs(collection(db, "quotations"));
     setQuotations(qSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
     const cSnap = await getDocs(collection(db, "customers"));
     setCustomers(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
@@ -52,17 +49,12 @@ export default function Quotations() {
   };
 
   const addItem = () => setFormData({ ...formData, items: [...formData.items, { name: '', qty: 1, price: 0 }] });
-
   const updateItem = (index, field, value) => {
     const newItems = [...formData.items];
     newItems[index][field] = value;
     setFormData({ ...formData, items: newItems });
   };
-
-  const removeItem = (index) => {
-    const newItems = formData.items.filter((_, i) => i !== index);
-    setFormData({ ...formData, items: newItems });
-  };
+  const removeItem = (index) => setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) });
 
   return (
     <div>
@@ -100,9 +92,7 @@ export default function Quotations() {
                   <td className="px-6 py-4">{q.customerName}</td>
                   <td className="px-6 py-4 font-semibold">{formatCurrency(q.total)}</td>
                   <td className="px-6 py-4">
-                    <button onClick={() => setSelectedDoc(q)} className="text-blue-600 flex items-center gap-1">
-                      <Printer size={16} /> Print
-                    </button>
+                    <button onClick={() => setSelectedDoc(q)} className="text-blue-600 flex items-center gap-1"><Printer size={16} /> Print</button>
                   </td>
                 </tr>
               ))}
@@ -114,7 +104,8 @@ export default function Quotations() {
       {isCreating && (
         <div className="bg-white rounded-lg shadow p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+             {/* ... form inputs remain mostly same, omitted for brevity but standard ... */}
+             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Customer</label>
                 <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="mt-1 block w-full border rounded-md p-2">
@@ -148,27 +139,28 @@ export default function Quotations() {
                <textarea rows="2" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="mt-1 block w-full border rounded-md p-2"></textarea>
             </div>
 
-            <div className="text-right text-xl font-bold">
-              Total: {formatCurrency(calculateTotal(formData.items))}
-            </div>
+            <div className="text-right text-xl font-bold">Total: {formatCurrency(calculateTotal(formData.items))}</div>
 
-            <div className="flex justify-end gap-2">
-              <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-md">Simpan</button>
-            </div>
+            <div className="flex justify-end gap-2"><button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-md">Simpan</button></div>
           </form>
         </div>
       )}
 
       {selectedDoc && (
         <div className="bg-gray-100 p-6 rounded-lg">
-          <div className="mb-4 flex justify-end">
-             <button onClick={handlePrint} className="bg-green-600 text-white px-4 py-2 rounded flex gap-2"><Printer size={20}/> Cetak / PDF</button>
-          </div>
-          <div ref={printRef} className="bg-white p-10 max-w-4xl mx-auto shadow-lg text-black print:shadow-none">
-             <div className="border-b-2 border-gray-800 pb-4 mb-6 text-center">
-               <h1 className="text-3xl font-bold uppercase tracking-wider">Surat Penawaran</h1>
-               <p className="text-gray-600 mt-1">Toko Komputer App - Solusi IT Terbaik</p>
+          <div className="mb-4 flex justify-end"><button onClick={handlePrint} className="bg-green-600 text-white px-4 py-2 rounded flex gap-2"><Printer size={20}/> Cetak / PDF</button></div>
+          <div ref={printRef} className="bg-white p-10 max-w-4xl mx-auto shadow-lg text-black print:shadow-none print:p-0">
+
+             {/* Header with Logo */}
+             <div className="border-b-2 border-gray-800 pb-4 mb-6 flex flex-col items-center">
+               {settings.logoBase64 && (
+                  <img src={settings.logoBase64} alt="Logo" className="max-h-24 object-contain mb-4" />
+               )}
+               <h1 className="text-3xl font-bold uppercase tracking-wider">{settings.storeName}</h1>
+               <p className="text-gray-600 mt-1">{settings.subtitle}</p>
              </div>
+
+             <div className="text-center bg-gray-100 py-2 mb-6 rounded font-bold uppercase tracking-widest border border-gray-300">Surat Penawaran</div>
 
              <div className="flex justify-between mb-8">
                 <div>
@@ -216,7 +208,7 @@ export default function Quotations() {
              <div className="mt-16 flex justify-end">
                <div className="text-center w-48">
                  <p className="mb-16">Hormat Kami,</p>
-                 <p className="border-t border-gray-400 pt-1">( Admin )</p>
+                 <p className="border-t border-gray-400 pt-1 font-semibold">( {settings.senderName} )</p>
                </div>
              </div>
           </div>

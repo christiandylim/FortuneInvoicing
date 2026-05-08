@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db, collection, getDocs, addDoc } from '../lib/db';
 
 const AuthContext = createContext();
 
@@ -7,17 +8,36 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      // Check for stored session
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+
+      // Seed default admin if no users exist
+      const usersSnap = await getDocs(collection(db, "users"));
+      if (usersSnap.docs.length === 0) {
+        await addDoc(collection(db, "users"), {
+          username: 'admin',
+          password: 'admin',
+          role: 'admin',
+          name: 'Andry'
+        });
+      }
+      setLoading(false);
+    };
+    initAuth();
   }, []);
 
-  const login = (username, password) => {
-    if (username === 'admin' && password === 'admin') {
-      const userData = { username: 'admin', role: 'admin' };
+  const login = async (username, password) => {
+    const usersSnap = await getDocs(collection(db, "users"));
+    const users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    const foundUser = users.find(u => u.username === username && u.password === password);
+
+    if (foundUser) {
+      const userData = { id: foundUser.id, username: foundUser.username, role: foundUser.role, name: foundUser.name };
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       return true;

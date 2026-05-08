@@ -3,12 +3,14 @@ import { db, collection, getDocs, addDoc } from '../lib/db';
 import { Plus, Printer } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useSettings } from '../context/SettingsContext';
 
 export default function PurchaseOrders() {
   const [pos, setPos] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const { settings } = useSettings();
 
   const [formData, setFormData] = useState({
     supplierId: '',
@@ -42,9 +44,6 @@ export default function PurchaseOrders() {
       number: `PO-${Date.now()}`
     };
     await addDoc(collection(db, "purchase_orders"), docData);
-
-    // Notice: We don't auto-record finance here. Finance Out is usually recorded when paying the invoice received from supplier.
-
     setIsCreating(false);
     fetchData();
   };
@@ -120,7 +119,7 @@ export default function PurchaseOrders() {
               </div>
               {formData.items.map((item, index) => (
                 <div key={index} className="flex gap-2 mb-2 items-start">
-                  <input required placeholder="Nama Barang (Sesuai Katalog Supplier)" value={item.name} onChange={e => updateItem(index, 'name', e.target.value)} className="flex-1 border rounded p-2" />
+                  <input required placeholder="Nama Barang" value={item.name} onChange={e => updateItem(index, 'name', e.target.value)} className="flex-1 border rounded p-2" />
                   <input required type="number" placeholder="Qty" value={item.qty} onChange={e => updateItem(index, 'qty', Number(e.target.value))} className="w-20 border rounded p-2" />
                   <input required type="number" placeholder="Estimasi Harga" value={item.price} onChange={e => updateItem(index, 'price', Number(e.target.value))} className="w-40 border rounded p-2" />
                   <button type="button" onClick={() => removeItem(index)} className="p-2 text-red-600 mt-1">X</button>
@@ -140,13 +139,17 @@ export default function PurchaseOrders() {
       {selectedDoc && (
         <div className="bg-gray-100 p-6 rounded-lg">
           <div className="mb-4 flex justify-end"><button onClick={handlePrint} className="bg-green-600 text-white px-4 py-2 rounded flex gap-2"><Printer size={20}/> Cetak / PDF</button></div>
-          <div ref={printRef} className="bg-white p-10 max-w-4xl mx-auto shadow-lg text-black print:shadow-none">
+          <div ref={printRef} className="bg-white p-10 max-w-4xl mx-auto shadow-lg text-black print:shadow-none print:p-0">
 
              <div className="flex justify-between items-start border-b-2 border-gray-800 pb-6 mb-8">
-               <div>
-                 <h1 className="text-3xl font-bold uppercase text-gray-900">Purchase Order</h1>
-                 <p className="text-gray-600 mt-1 font-medium">Toko Komputer App</p>
-                 <p className="text-gray-500 text-sm mt-2">Jl. Contoh Alamat Toko No. 123<br/>Telp: 0812-3456-7890</p>
+               <div className="flex items-center gap-4">
+                 {settings.logoBase64 && (
+                    <img src={settings.logoBase64} alt="Logo" className="max-h-20 object-contain" />
+                 )}
+                 <div>
+                   <h1 className="text-3xl font-bold uppercase text-gray-900">{settings.storeName}</h1>
+                   <p className="text-gray-600 mt-1 font-medium">{settings.subtitle}</p>
+                 </div>
                </div>
                <div className="text-right">
                  <div className="bg-gray-100 p-3 rounded text-left inline-block min-w-[200px]">
@@ -168,7 +171,7 @@ export default function PurchaseOrders() {
 
              <table className="w-full mb-8 border-collapse">
                <thead>
-                 <tr className="bg-gray-800 text-white">
+                 <tr className="bg-gray-800 text-white print:bg-gray-800 print:text-black">
                    <th className="py-2 px-4 text-left">Item Description</th>
                    <th className="py-2 px-4 text-center">Qty</th>
                    <th className="py-2 px-4 text-right">Unit Price (Est)</th>
@@ -201,7 +204,7 @@ export default function PurchaseOrders() {
              <div className="mt-16 flex justify-between">
                <div className="text-center w-48">
                  <p className="mb-20 text-gray-500">Authorized Signature</p>
-                 <p className="border-t border-gray-800 pt-2 font-bold">( Purchasing Dept )</p>
+                 <p className="border-t border-gray-800 pt-2 font-bold">( {settings.senderName} )</p>
                </div>
              </div>
           </div>
